@@ -509,7 +509,18 @@
                 <button class="lang-btn" data-lang="VI">Tiếng Việt</button>
             </div>
         </div>
-
+        <!-- result modal-->
+<div class="modal" id="gameOverModal">
+    <div class="modal-content" style="text-align: center; max-width: 400px;">
+        <h2 id="gameOverTitle">GAME ENDED</h2>
+        <p id="gameOverMessage" style="font-size: 16px; margin: 20px 0; font-weight: bold;">...</p>
+        
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px;">
+            <button class="start-btn" id="modalRestartBtn" style="width: auto; padding: 10px 20px;">🔄 REPLAY</button>
+            <button class="modal-close-btn" id="modalMenuBtn" style="width: auto;">BACK TO MENU</button>
+        </div>
+    </div>
+</div>
         <!-- HOW TO PLAY MODAL -->
         <div class="modal" id="howToPlayModal">
             <div class="modal-content">
@@ -670,6 +681,10 @@
                     winMsg: " YOU WIN! All bombs defused!",
                     loseMsg: " GAME OVER. You lost.",
                     modalTitle: "HOW TO PLAY",
+                    gameOverTitleWin: "VICTORY",
+                    gameOverTitleLose: "GAME OVER",
+                    btnReplay: "Play Again",
+                    btnMenu: "Back to Menu",
                     modalContent: `
                      <h3> STORY</h3>
                         <p>The player takes on the role of a bomb removal soldier, dispatched to a derelict area to locate and defuse every mine before the main squad moves in.</p>
@@ -786,6 +801,10 @@
                     logTitle: "Nhật Ký",
                     winMsg: " BẠN THẮNG! Đã gỡ hết bom!",
                     loseMsg: " THUA CUỘC. Bạn đã nổ tung.",
+                    gameOverTitleWin: "CHIẾN THẮNG",
+                    gameOverTitleLose: "THẤT BẠI",
+                    btnReplay: "Chơi Lại",
+                    btnMenu: "Về Menu",
                     modalTitle: "HƯỚNG DẪN CHƠI",
                     modalContent: `
                         <h3>CÂU CHUYỆN</h3>
@@ -1079,8 +1098,11 @@
             }
 
             getUnflippedTiles() {
-                return Array.from({ length: this.tiles.length }, (_, i) => i).filter(i => !this.isTileFlipped(i) && !this.isDetected(i));
-            }
+    // Chỉ loại trừ những ô đã lật hoàn toàn (isTileFlipped)
+    // Giữ lại cả những ô đã bị soi (detected) nhưng vẫn đang úp
+    return Array.from({ length: this.tiles.length }, (_, i) => i)
+                .filter(i => !this.isTileFlipped(i));
+}
 
             checkDeadEnd() {
                 const unflippedCount = this.getUnflippedTiles().length;
@@ -1265,13 +1287,19 @@
             }
 
             shuffleRemaining() {
-                const unflipped = this.state.getUnflippedTiles();
-                const values = unflipped.map(i => this.state.tiles[i]);
-                this.state.shuffleArray(values);
-                unflipped.forEach((idx, pos) => {
-                    this.state.tiles[idx] = values[pos];
-                });
-            }
+     const unflipped = this.state.getUnflippedTiles(); // Lúc này đã bao gồm thẻ bomb đã dò
+    const values = unflipped.map(i => this.state.tiles[i]);
+    
+    this.state.shuffleArray(values);
+    
+    unflipped.forEach((idx, pos) => {
+        this.state.tiles[idx] = values[pos];
+    });
+
+    // QUAN TRỌNG: Sau khi xáo trộn, vị trí đã soi không còn chính xác nữa
+    // Chúng ta cần xóa bộ nhớ các ô đã soi để người chơi phải soi lại
+    this.state.detectedTiles.clear(); 
+}
 
             handleAdrenalineRush() {
                 const unflipped = this.state.getUnflippedTiles();
@@ -1286,6 +1314,20 @@
                 return TRANSLATIONS[currentLanguage].tiles[type] || 'Unknown';
             }
         }
+        // ... (existing initialization code) ...
+
+        // Game Over Modal Buttons
+        const gameOverModal = document.getElementById('gameOverModal');
+        
+        document.getElementById('modalRestartBtn').addEventListener('click', () => {
+            gameOverModal.classList.remove('show');
+            ui.startGame(); // Restart immediately with same settings
+        });
+
+        document.getElementById('modalMenuBtn').addEventListener('click', () => {
+            gameOverModal.classList.remove('show');
+            ui.backToSetup(); // Go back to setup screen
+        });
 
         // ========================================
         // UI CONTROLLER
@@ -1823,14 +1865,35 @@
 
             renderGameOverMessage() {
                 const t = TRANSLATIONS[currentLanguage].ui;
-                const statusMsg = document.getElementById('statusMessage');
+                const modal = document.getElementById('gameOverModal');
+                const title = document.getElementById('gameOverTitle');
+                const msg = document.getElementById('gameOverMessage');
+                
+                // Buttons
+                const restartBtn = document.getElementById('modalRestartBtn');
+                const menuBtn = document.getElementById('modalMenuBtn');
+
+                // Update text based on result using the new translations
                 if (this.engine.state.gameWon) {
-                    statusMsg.className = 'status-message status-win';
-                    statusMsg.textContent = t.winMsg;
+                    title.textContent = " " + t.gameOverTitleWin + " ";
+                    title.style.color = 'var(--success-ink)';
+                    title.style.borderColor = 'var(--success-ink)';
+                    msg.textContent = t.winMsg;
+                    msg.style.color = 'var(--success-ink)';
                 } else {
-                    statusMsg.className = 'status-message status-lose';
-                    statusMsg.textContent = t.loseMsg;
+                    title.textContent = " " + t.gameOverTitleLose + " ";
+                    title.style.color = 'var(--danger-ink)';
+                    title.style.borderColor = 'var(--danger-ink)';
+                    msg.textContent = t.loseMsg;
+                    msg.style.color = 'var(--danger-ink)';
                 }
+                
+                // Update button text dynamically
+                restartBtn.textContent = "" + t.btnReplay;
+                menuBtn.textContent = "" + t.btnMenu;
+
+                // Show the modal
+                modal.classList.add('show');
             }
 
             updateDetectorButton() {
