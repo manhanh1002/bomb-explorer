@@ -699,13 +699,14 @@
 
     <script>
         // Đăng ký Service Worker
-  if ('service-worker' in navigator) {
+if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
-        .then(reg => console.log('Service Worker đã sẵn sàng!', reg))
-        .catch(err => console.log('Lỗi đăng ký SW:', err));
+        // Sử dụng './sw.js' thay vì '/sw.js' để tương thích với GitHub Pages
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW registered!', reg))
+            .catch(err => console.log('SW registration failed:', err));
     });
-  }
+}
         // ========================================
         // CONSTANTS & TRANSLATIONS
         // ========================================
