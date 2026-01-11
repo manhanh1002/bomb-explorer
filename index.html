@@ -5,6 +5,68 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bomb Explorer - Solo & Multi Bomb Game Prototype</title>
     <style>
+        @keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    50% { transform: translate(-1px, 2px) rotate(1deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    100% { transform: translate(1px, -2px) rotate(0deg); }
+        }
+
+        .shake-effect {
+        animation: shake 0.5s;
+        animation-iteration-count: 1;
+         }
+         .modal-lost-style {
+    background-color: #2a0000 !important;
+    color: #ff0000 !important;
+    border: 3px solid #ff0000 !important;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+    position: relative;
+}
+
+/* Hiệu ứng nhấp nháy đỏ khi thua */
+@keyframes red-flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+.modal-lost-style h2 {
+    animation: red-flash 0.2s infinite;
+}
+/* Hiệu ứng tia quét Radar */
+@keyframes radar-scan {
+    0% { top: -5%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 105%; opacity: 0; }
+}
+
+/* Container chứa lưới game khi ở chế độ Detector */
+.grid-container.detector-active {
+    position: relative;
+    overflow: hidden; /* Để tia quét không bay ra ngoài bảng */
+    border: 2px solid var(--success-ink); /* Đổi viền bảng sang xanh khi dò */
+    transition: border 0.3s ease;
+}
+
+/* Cấu trúc của tia quét */
+.grid-container.detector-active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 15px; /* Độ dày của tia sáng */
+    background: linear-gradient(to bottom, 
+        transparent, 
+        rgba(0, 255, 0, 0.4), 
+        transparent);
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+    z-index: 10;
+    pointer-events: none; /* Quan trọng: để không ngăn cản việc click vào ô */
+    animation: radar-scan 2s linear infinite;
+}
         :root {
             --paper-light: #e8e3d7;   /* Old paper */
             --paper-dark:  #cfc8b8;   /* Aged paper */
@@ -636,6 +698,14 @@
     </div>
 
     <script>
+        // Đăng ký Service Worker
+  if ('service-worker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('Service Worker đã sẵn sàng!', reg))
+        .catch(err => console.log('Lỗi đăng ký SW:', err));
+    });
+  }
         // ========================================
         // CONSTANTS & TRANSLATIONS
         // ========================================
@@ -679,7 +749,7 @@
                     eventTitle: "Event",
                     logTitle: "Game Log",
                     winMsg: " YOU WIN! All bombs defused!",
-                    loseMsg: " GAME OVER. You lost.",
+                    loseMsg: " You lost.",
                     modalTitle: "HOW TO PLAY",
                     gameOverTitleWin: "VICTORY",
                     gameOverTitleLose: "GAME OVER",
@@ -737,7 +807,7 @@
                     bombDetectedNeedKits: "⚠️ BOMB DETECTED: Need 2 Defuse Kits to defuse. Tile remains face-down.",
                     tileFlipped: " Tile flipped: {tile}",
                     suddenRainElim: " SUDDEN RAIN: Player eliminated. Bomb removed. Game continues.",
-                    gameOverBomb: " GAME OVER: Bomb flipped without enough Defuse Kits.",
+                    gameOverBomb: " Bomb flipped without enough Defuse Kits.",
                     defuseKitCollected: " Defuse Kit collected! ({count} available)",
                     detectorRestored: " Detector Repair: Restored 1 detector (now have {count} available).",
                     detectorNoRepair: " Detector Repair: No used detectors to restore.",
@@ -748,15 +818,15 @@
                     autoFlip: "Auto-flipping index {index}...",
                     adrenalineFlipResult: "Adrenaline flip result: {tile}",
                     bombDefusedAdrenaline: " BOMB DEFUSED (adrenaline)! Bombs remaining: {count}",
-                    gameOverAdrenaline: " GAME OVER: Bomb hit during adrenaline flip without kits.",
+                    gameOverAdrenaline: "  Bomb hit during adrenaline flip without kits.",
                     adrenalineAgain: "ADRENALINE triggered again! Choose next tile to flip.",
                     autoFlipResult: "Auto-flip result: {tile}",
                     bombDefusedAuto: " BOMB DEFUSED (auto-flip)! Bombs remaining: {count}",
-                    gameOverAuto: " GAME OVER: Bomb hit during auto-flip without kits.",
+                    gameOverAuto: "  Bomb hit during auto-flip without kits.",
                     adrenalineChoice: "ADRENALINE: Choose 1 tile to flip (Detector unavailable)",
                     adrenalineDetector: "ADRENALINE (via detector): Choose next tile to flip. Detector available (CALM TEAM).",
                     adrenalineDetectorNo: "ADRENALINE (via detector): Choose next tile to flip (Detector unavailable).",
-                    deadEnd: " GAME OVER: Dead-end detected! Remaining tiles ({unflipped}) equals remaining bombs ({bombs}). All remaining tiles are bombs!",
+                    deadEnd: " Dead-end detected: {bombs} Bomb time counted to Zero and auto explode!As remaining tiles equals remaining bombs!",
                     gameIsOver: "Game is over",
                     tileAlreadyFlipped: "Tile already flipped",
                     tileAlreadyDetected: "Tile already detected",
@@ -799,8 +869,8 @@
                     lost: "THUA ",
                     eventTitle: "Sự Kiện",
                     logTitle: "Nhật Ký",
-                    winMsg: " BẠN THẮNG! Đã gỡ hết bom!",
-                    loseMsg: " THUA CUỘC. Bạn đã nổ tung.",
+                    winMsg: " Hoàn thành tốt nhiệm vụ gỡ bomb!",
+                    loseMsg: " Bùm! Bạn đã bị nổ tung.",
                     gameOverTitleWin: "CHIẾN THẮNG",
                     gameOverTitleLose: "THẤT BẠI",
                     btnReplay: "Chơi Lại",
@@ -848,17 +918,17 @@
                             <li><strong>Nền Đất Tốt:</strong> Chỉ có 1 ô Rung Chấn (vô dụng).</li>
                         </ul>
                         <h3> CHIẾN THẮNG</h3>
-                        <p>Thu thập đủ Bộ Gỡ, sau đó lật tất cả ô Bom. Khi sạch bóng quân thù, bạn THẮNG!</p>
+                        <p>Thu thập đủ Bộ Gỡ, sau đó lật tất cả ô Bom. Khi sạch bóng bomb trong khu vực, bạn THẮNG!</p>
                     `
                 },
                 logs: {
                     detectorUsed: " Đã dùng Máy Dò: Lộ diện {tile}",
                     bombDefused: " GỠ BOM THÀNH CÔNG! Còn lại: {count}",
-                    allDefused: " ĐÃ GỠ HẾT BOM! BẠN THẮNG!",
+                    allDefused: " ĐÃ GỠ HẾT BOM!",
                     bombDetectedNeedKits: "  PHÁT HIỆN BOM: Cần 2 Bộ Gỡ để xử lý. Ô vẫn úp.",
                     tileFlipped: " Đã lật: {tile}",
                     suddenRainElim: " MƯA BẤT CHỢT: Người chơi bị loại. Bom biến mất. Tiếp tục.",
-                    gameOverBomb: " THUA CUỘC: Lật trúng Bom mà không đủ Bộ Gỡ.",
+                    gameOverBomb: " Lật trúng Bom mà không đủ Bộ Gỡ.",
                     defuseKitCollected: " Nhặt được Bộ Gỡ! (Hiện có {count})",
                     detectorRestored: " Sửa Máy Dò: Hồi phục 1 máy (Hiện có {count}).",
                     detectorNoRepair: " Sửa Máy Dò: Không có máy nào hỏng để sửa.",
@@ -873,11 +943,11 @@
                     adrenalineAgain: "HƯNG PHẤN kích hoạt tiếp! Chọn ô tiếp theo để lật.",
                     autoFlipResult: "Kết quả tự lật: {tile}",
                     bombDefusedAuto: " GỠ BOM (tự lật)! Còn lại: {count}",
-                    gameOverAuto: " THUA CUỘC: Nổ bom trong lúc tự lật (thiếu Bộ Gỡ).",
+                    gameOverAuto: " Nổ bom trong lúc tự lật (thiếu Bộ Gỡ).",
                     adrenalineChoice: "HƯNG PHẤN: Chọn 1 ô để lật (Không dùng được Máy Dò)",
                     adrenalineDetector: "HƯNG PHẤN (qua Máy Dò): Chọn ô để lật. Được dùng Máy Dò (Giữ Bình Tĩnh).",
                     adrenalineDetectorNo: "HƯNG PHẤN (qua Máy Dò): Chọn ô để lật (Không dùng được Máy Dò).",
-                    deadEnd: " TRÒ CHƠI KẾT THÚC: Ngõ cụt! Số ô còn lại ({unflipped}) bằng số bom ({bombs}). Tất cả là bom!",
+                    deadEnd: " Đếm ngược về 0: {bombs} Bomb cuối tự phát nổ!Do số ô còn lại bằng số bom!",
                     gameIsOver: "Trò chơi đã kết thúc",
                     tileAlreadyFlipped: "Ô đã được lật",
                     tileAlreadyDetected: "Ô đã được dò",
@@ -1516,25 +1586,43 @@
                 this.render();
             }
 
-            handleTileClick(index) {
-                if (this.engine.state.gameOver) {
-                    alert(TRANSLATIONS[currentLanguage].logs.gameIsOver);
-                    return;
-                }
-                if (this.engine.state.isTileFlipped(index)) return;
+            // Trong class UIController
+handleTileClick(index) {
+    if (this.engine.state.gameOver) {
+        alert(TRANSLATIONS[currentLanguage].logs.gameIsOver);
+        return;
+    }
+    
+    // Nếu ô đã lật hẳn rồi thì bỏ qua
+    if (this.engine.state.isTileFlipped(index)) return;
 
-                // If pending adrenaline flip, handle it
-                if (this.pendingAdrenalineFlip) {
-                    this.completeAdrenalineFlip(index);
-                    return;
-                }
+    // Lấy thông tin ô
+    const isDetected = this.engine.state.isDetected(index);
+    const tile = this.engine.state.getTile(index);
 
-                if (this.engine.state.detectorMode) {
-                    this.handleDetectorClick(index);
-                } else {
-                    this.handleFlipClick(index);
-                }
-            }
+    // --- SỬA LOGIC CHẶN CLICK ---
+    // Chỉ chặn click nếu:
+    // 1. Ô đã được dò 
+    // 2. VÀ ô đó KHÔNG PHẢI LÀ BOM (vì bom đã dò vẫn cần click để gỡ)
+    // 3. VÀ không phải đang trong chế độ Adrenaline (Adrenaline được click tất)
+    if (isDetected && tile.type !== TILE_TYPES.BOMB && !this.pendingAdrenalineFlip) {
+        return; 
+    }
+    // ----------------------------
+
+    // Nếu đang chờ Adrenaline
+    if (this.pendingAdrenalineFlip) {
+        this.completeAdrenalineFlip(index);
+        return;
+    }
+
+    if (this.engine.state.detectorMode) {
+        this.handleDetectorClick(index);
+    } else {
+        // Lúc này click vào Bom đã dò sẽ chạy xuống đây để gỡ
+        this.handleFlipClick(index);
+    }
+}
 
             handleDetectorClick(index) {
                 const result = this.engine.detectTile(index);
@@ -1647,59 +1735,80 @@
                 this.render();
             }
 
-            completeAdrenalineFlip(index) {
-                const tile = this.engine.state.getTile(index);
-                this.engine.state.flippedTiles.add(index);
-                this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.adrenalineFlipResult.replace('{tile}', this.engine.getTileDisplayName(tile.type)), 'info');
+            // Trong class UIController
+completeAdrenalineFlip(index) {
+    const tile = this.engine.state.getTile(index);
+    
+    // Đánh dấu đã lật
+    this.engine.state.flippedTiles.add(index);
+    
+    // Log thông báo
+    this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.adrenalineFlipResult.replace('{tile}', this.engine.getTileDisplayName(tile.type)), 'info');
 
-                if (tile.type === TILE_TYPES.BOMB) {
-                    if (this.engine.state.defuseKitsAvailable >= 2) {
-                        this.engine.state.defuseKitsAvailable -= 2;
-                        this.engine.state.bombsRemaining--;
-                        
-                        if (this.engine.state.bombsRemaining === 0) {
-                            this.engine.state.gameWon = true;
-                            this.engine.state.gameOver = true;
-                            this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.allDefused, 'success');
-                        } else {
-                            this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.bombDefusedAdrenaline.replace('{count}', this.engine.state.bombsRemaining), 'success');
-                        }
-                        
-                        this.pendingAdrenalineFlip = false;
-                        this.render();
-                        return;
-                    } else {
-                        if (this.engine.state.event.modifiers.suddenRain && !this.engine.state.suddenRainUsed) {
-                            this.engine.state.suddenRainUsed = true;
-                            this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.suddenRainElim, 'danger');
-                            this.engine.state.bombsRemaining--;
-                            
-                            if (this.engine.state.bombsRemaining === 0) {
-                                this.engine.state.gameWon = true;
-                                this.engine.state.gameOver = true;
-                                this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.allDefused, 'success');
-                            }
-                        } else {
-                            this.engine.state.gameOver = true;
-                            this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.gameOverAdrenaline, 'danger');
-                        }
-                        this.pendingAdrenalineFlip = false;
-                        this.render();
-                        return;
-                    }
+    // Tắt trạng thái chờ Adrenaline TRƯỚC (để render đúng)
+    this.pendingAdrenalineFlip = false;
+
+    // TRƯỜNG HỢP 1: LẬT TRÚNG BOM
+    if (tile.type === TILE_TYPES.BOMB) {
+        if (this.engine.state.defuseKitsAvailable >= 2) {
+            this.engine.state.defuseKitsAvailable -= 2;
+            this.engine.state.bombsRemaining--;
+            
+            if (this.engine.state.bombsRemaining === 0) {
+                this.engine.state.gameWon = true;
+                this.engine.state.gameOver = true;
+                this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.allDefused, 'success');
+            } else {
+                this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.bombDefusedAdrenaline.replace('{count}', this.engine.state.bombsRemaining), 'success');
+                
+                // Kiểm tra Dead-end sau khi gỡ bom (trường hợp hiếm nhưng cần thiết)
+                if (this.engine.state.checkDeadEnd()) {
+                     this.engine.state.gameOver = true;
+                }
+            }
+        } else {
+            // Xử lý Mưa Bất Chợt hoặc Thua
+            if (this.engine.state.event.modifiers.suddenRain && !this.engine.state.suddenRainUsed) {
+                this.engine.state.suddenRainUsed = true;
+                this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.suddenRainElim, 'danger');
+                this.engine.state.bombsRemaining--;
+                
+                if (this.engine.state.bombsRemaining === 0) {
+                    this.engine.state.gameWon = true;
+                    this.engine.state.gameOver = true;
+                    this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.allDefused, 'success');
                 } else {
-                    const flipResult = this.engine.processTileEffect(tile);
-                    if (flipResult.effect && flipResult.effect.type === 'ADRENALINE') {
-                        this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.adrenalineAgain, 'warning');
-                        this.pendingAdrenalineFlip = true;
-                        this.render();
-                        return;
+                    // Check dead-end sau khi bom biến mất do mưa
+                    if (this.engine.state.checkDeadEnd()) {
+                        this.engine.state.gameOver = true;
                     }
                 }
-
-                this.pendingAdrenalineFlip = false;
-                this.render();
+            } else {
+                this.engine.state.gameOver = true;
+                this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.gameOverAdrenaline, 'danger');
             }
+        }
+    } 
+    // TRƯỜNG HỢP 2: LẬT Ô AN TOÀN (KHÔNG PHẢI BOM)
+    else {
+        const flipResult = this.engine.processTileEffect(tile);
+        
+        // --- SỬA QUAN TRỌNG: KIỂM TRA DEAD-END NGAY TẠI ĐÂY ---
+        // Sau khi lật 1 ô thường, kiểm tra xem số ô úp còn lại có bằng số bom không
+        if (this.engine.state.checkDeadEnd()) {
+            this.engine.state.gameOver = true;
+            // Không return ở đây để code render chạy ở dưới
+        } 
+        // Nếu chưa Dead-end thì mới xét tiếp hiệu ứng Adrenaline nối tiếp
+        else if (flipResult.effect && flipResult.effect.type === 'ADRENALINE') {
+            this.engine.state.addLog(TRANSLATIONS[currentLanguage].logs.adrenalineAgain, 'warning');
+            this.pendingAdrenalineFlip = true;
+        }
+        // -------------------------------------------------------
+    }
+
+    this.render();
+}
 
             handleAutoFlip(index) {
                 const tile = this.engine.state.getTile(index);
@@ -1793,19 +1902,32 @@
                         tile.textContent = '';
                         tile.classList.add('tile-flipped', this.getTileColorClass(tileData.type));
                         tile.style.pointerEvents = 'none';
-                    } else if (isDetected) {
-                        const tileData = this.engine.state.getTile(i);
-                        if (tileData.type === TILE_TYPES.BOMB) {
-                            tile.textContent = '';
-                            tile.classList.add('tile-unflipped', 'tile-disabled');
-                        } else {
-                            tile.textContent = '';
-                            tile.classList.add('tile-flipped', this.getTileColorClass(tileData.type));
-                            tile.style.pointerEvents = 'none';
-                            tile.style.fontSize = '24px';
-                            tile.style.textShadow = '0 0 5px #000';
-                        }
-                    } else {
+                    } if (isDetected) {
+        const tileData = this.engine.state.getTile(i);
+        
+        if (tileData.type === TILE_TYPES.BOMB) {
+            // Hiển thị icon bom mờ hoặc dấu hiệu cảnh báo
+            tile.textContent = ''; 
+            tile.classList.add('tile-unflipped', 'tile-disabled');
+            
+            // --- SỬA TẠI ĐÂY: LUÔN CHO PHÉP CLICK VÀO BOM ĐÃ DÒ ---
+            // Dù có adrenaline hay không, ô bom đã dò vẫn phải click được để gỡ
+            tile.style.pointerEvents = 'auto'; 
+            tile.style.cursor = 'pointer';
+            
+            // Thêm viền đỏ/cam để người chơi biết đây là bom đã dò
+            tile.style.border = '2px dashed var(--danger-ink)'; 
+            // -------------------------------------------------------
+            
+        } else {
+            // Các ô an toàn đã dò thì hiển thị nội dung và KHÓA lại
+            tile.textContent = '';
+            tile.classList.add('tile-flipped', this.getTileColorClass(tileData.type));
+            tile.style.pointerEvents = 'none'; // Khóa click
+            tile.style.fontSize = '24px';
+            tile.style.textShadow = '0 0 5px #000';
+        }
+    } else {
                         tile.classList.add('tile-unflipped');
                         tile.textContent = this.pendingAdrenalineFlip ? '⚡' : '';
                         tile.classList.add('tile-disabled');
@@ -1862,39 +1984,52 @@
 
                 logContent.scrollTop = logContent.scrollHeight;
             }
-
             renderGameOverMessage() {
-                const t = TRANSLATIONS[currentLanguage].ui;
-                const modal = document.getElementById('gameOverModal');
-                const title = document.getElementById('gameOverTitle');
-                const msg = document.getElementById('gameOverMessage');
-                
-                // Buttons
-                const restartBtn = document.getElementById('modalRestartBtn');
-                const menuBtn = document.getElementById('modalMenuBtn');
+    const t = TRANSLATIONS[currentLanguage].ui;
+    const modal = document.getElementById('gameOverModal');
+    const title = document.getElementById('gameOverTitle');
+    const msg = document.getElementById('gameOverMessage');
+    const restartBtn = document.getElementById('modalRestartBtn');
+    const menuBtn = document.getElementById('modalMenuBtn');
 
-                // Update text based on result using the new translations
-                if (this.engine.state.gameWon) {
-                    title.textContent = " " + t.gameOverTitleWin + " ";
-                    title.style.color = 'var(--success-ink)';
-                    title.style.borderColor = 'var(--success-ink)';
-                    msg.textContent = t.winMsg;
-                    msg.style.color = 'var(--success-ink)';
-                } else {
-                    title.textContent = " " + t.gameOverTitleLose + " ";
-                    title.style.color = 'var(--danger-ink)';
-                    title.style.borderColor = 'var(--danger-ink)';
-                    msg.textContent = t.loseMsg;
-                    msg.style.color = 'var(--danger-ink)';
-                }
-                
-                // Update button text dynamically
-                restartBtn.textContent = "" + t.btnReplay;
-                menuBtn.textContent = "" + t.btnMenu;
+    // 1. Lấy thông tin từ engine
+    const state = this.engine.state;
+    const logs = state.log;
+    // Lấy nội dung tin nhắn cuối cùng trong log (lý do thắng/thua)
+    const lastAction = logs.length > 0 ? logs[logs.length - 1].message : "";
 
-                // Show the modal
-                modal.classList.add('show');
-            }
+    if (state.gameWon) {
+        title.textContent = "✯ " + t.gameOverTitleWin + " ✯";
+        title.style.color = 'var(--success-ink)';
+        title.style.borderColor = 'var(--success-ink)';
+        
+        // 2. Sử dụng innerHTML để hiển thị cả 2 dòng
+        msg.innerHTML = `
+            <div style="margin-bottom: 10px; font-weight: bold;">${t.winMsg}</div>
+            <div style="font-size: 0.9em; color: #555; font-style: italic; border-top: 1px dashed #ccc; padding-top: 5px;">
+                "${lastAction}"
+            </div>
+        `;
+    } else {
+        title.textContent = "☠ " + t.gameOverTitleLose + " ☠";
+        title.style.color = 'var(--danger-ink)';
+        title.style.borderColor = 'var(--danger-ink)';
+        
+        msg.innerHTML = `
+            <div style="margin-bottom: 10px; font-weight: bold;">${t.loseMsg}</div>
+            <div style="font-size: 0.9em; color: #721c24; font-style: italic; border-top: 1px dashed #f5c6cb; padding-top: 5px;">
+                "${lastAction}"
+            </div>
+        `;
+    }
+    
+    // Cập nhật text cho nút bấm
+    restartBtn.textContent = "⟳ " + t.btnReplay;
+    menuBtn.textContent = "⌂ " + t.btnMenu;
+
+    // Hiển thị modal
+    modal.classList.add('show');
+}
 
             updateDetectorButton() {
                 const t = TRANSLATIONS[currentLanguage].ui;

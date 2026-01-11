@@ -1,0 +1,16 @@
+{
+  "name": "Bomb Explorer Game",
+  "short_name": "BombExplorer",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a1a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "Assets/tiles/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
